@@ -1,0 +1,576 @@
+SAP ABAP PROGRAM REPORT TRANSAKSI BARANG
+
+----------------------------------------------------------------------------------
+
+YLATPOKPG24
+
+------------------------------------------------------------------------------------------
+
+*-----------------------------------------------------------------------
+* Copyright © 2022 Kopang
+*-----------------------------------------------------------------------
+* @author      ...
+* @created by  ...
+*-----------------------------------------------------------------------
+* @description
+*              no documentation
+*
+* @reference   not available
+*-----------------------------------------------------------------------
+* History
+* Date         Programmer   Ref.Document/Description
+* <HISTORY CONTENT>
+*
+*-----------------------------------------------------------------------
+
+REPORT YLATPOKPG24 NO STANDARD PAGE HEADING
+       MESSAGE-ID zabp.
+
+*       LINE-COUNT count
+*       LINE-SIZE size
+
+*----user defined include-----------------------------------------------
+*-----------------------------------------------------------------------
+* Global data include
+*-----------------------------------------------------------------------
+
+*INCLUDE zabpsknx00001top.
+
+INCLUDE ylatpokpg24top.
+
+SELECTION-SCREEN BEGIN OF BLOCK data WITH FRAME TITLE TEXT-001.
+*PARAMETERS p_pernr TYPE pernr.
+PARAMETERS : p_nopo TYPE ekko-ebeln OBLIGATORY,
+             p_nama TYPE char40 OBLIGATORY,
+             p_jab TYPE char40 OBLIGATORY.
+
+*SELECT-OPTIONS: s_option .
+SELECTION-SCREEN END OF BLOCK data.
+
+*---- using Kopang standard include ------------------------------------
+*---- DO NOT CHANGE THE STANDARD INCLUDE !
+INCLUDE zabpxin_alv.                 " ALV handler
+
+*----user defined include-----------------------------------------------
+*-----------------------------------------------------------------------
+* Subroutine include
+*-----------------------------------------------------------------------
+INCLUDE ylatpokpg24f01.
+
+INITIALIZATION.
+  PERFORM f_initialization.
+
+*-----------------------------------------------------------------------
+* Start-Of-Selection
+*-----------------------------------------------------------------------
+
+START-OF-SELECTION.
+  PERFORM f_get_data.
+
+END-OF-SELECTION.
+  IF t_data[] IS INITIAL.
+    MESSAGE ID 'AQ' TYPE 'I' NUMBER '260'.
+  ELSE.
+    PERFORM f_write_data.
+  ENDIF.
+
+*-----------------------------------------------------------------------
+* Events on selection screens
+*-----------------------------------------------------------------------
+
+AT SELECTION-SCREEN OUTPUT.
+* DO NOT CHANGE BELOW.
+*  PERFORM f_rpt_init_block.
+* start coding here
+  LOOP AT SCREEN.
+    IF screen-name CS 'P_VARI'.
+      screen-active = 0.
+    ENDIF.
+    MODIFY SCREEN.
+  ENDLOOP.
+
+AT SELECTION-SCREEN.
+
+*-----------------------------------------------------------------------
+* Events in lists
+*-----------------------------------------------------------------------
+AT LINE-SELECTION.
+
+AT USER-COMMAND.
+  AT pfn.
+
+
+
+----------------------------------------------------------------------------------------------------
+
+YLATPOKPG24F01
+
+------------------------------------------------------------------------------------------------------------
+
+**&---------------------------------------------------------------------*
+*&  Include ZABPSKNX00001F01                                           *
+*&  Subroutine Include                                                 *
+*----------------------------------------------------------------------*
+
+*-----------------------------------------------------------------------
+* Form          : F_INITIALIZATION
+* Description   : First initialization.
+*                 <Generated code>
+*-----------------------------------------------------------------------
+FORM f_initialization .
+  PERFORM f_alv_init.
+ENDFORM.                    "F_INITIALIZATION
+
+*$*$--------------------------------------------------------------------
+*$*$ Form          : F_GET_DATA
+*$*$ Description   : Select data from database
+*$*$                 <Generated code>
+*$*$--------------------------------------------------------------------
+
+FORM f_get_data.
+  DATA : lv_no TYPE int3,
+         lv_sub TYPE dmbtr,
+         lv_ppn TYPE dmbtr,
+         lv_total TYPE dmbtr,
+         it_total TYPE TABLE OF YLATSTPOKPG24_02,
+         wa_total LIKE LINE OF it_total.
+
+  SELECT a~ebeln, a~bedat, a~knumv,
+         b~name1, b~stras, b~ort01, b~pstlz,
+         c~matnr, c~menge, c~erfme, c~dmbtr, c~waers,
+         d~maktx, d~spras
+    FROM ekko AS a
+    INNER JOIN lfa1 AS b ON b~lifnr = a~lifnr
+    INNER JOIN matdoc AS c ON c~ebeln = a~ebeln
+    INNER JOIN makt AS d ON d~matnr = c~matnr
+    INTO TABLE @DATA(t_join)
+    WHERE a~ebeln = @p_nopo AND d~spras = 'E'.
+
+  IF sy-subrc = 0.
+    LOOP AT t_join INTO DATA(wa_join).
+      lv_no = lv_no + 1.
+      wa_data-no = lv_no.
+      wa_data-nopo = wa_join-ebeln.
+      wa_data-tanggalpo = wa_join-bedat.
+      wa_data-nosurat = wa_join-knumv.
+      wa_data-namaperusahaan = wa_join-name1.
+      wa_data-alamat = wa_join-stras.
+      wa_data-kota = wa_join-ort01.
+      wa_data-kodepos = wa_join-pstlz.
+      wa_data-namabarang = wa_join-maktx.
+      wa_data-kodebarang = wa_join-matnr.
+      wa_data-jumlah = wa_join-menge.
+      wa_data-satuan = wa_join-erfme.
+      wa_data-harga = wa_join-dmbtr.
+      wa_data-currency = wa_join-waers.
+
+      lv_sub = lv_sub + wa_data-harga.
+
+
+      APPEND wa_data TO t_data.
+      CLEAR wa_data.
+
+    ENDLOOP.
+
+    lv_ppn = lv_sub * 1 / 10.
+    lv_total = lv_sub + lv_ppn.
+    gv_sub = lv_sub.
+    gv_ppn = lv_ppn.
+    gv_total = lv_total.
+
+  ENDIF.
+ENDFORM.
+
+*$*$--------------------------------------------------------------------
+*$*$ Form          : F_WRITE_DATA
+*$*$ Description   : Display data
+*$*$                 <Generated code>
+*$*$--------------------------------------------------------------------
+FORM f_write_data.
+  TYPES : BEGIN OF t_identitas,
+            nomorpo TYPE ekko-ebeln,
+            tanggalpo TYPE ekko-bedat,
+            suratjalan TYPE ekko-knumv,
+          END OF t_identitas.
+
+*  DATA : ld_tanggal(50),
+*         lv_text TYPE T247-LTX,
+*         ld_bedat TYPE ekko-bedat,
+*         ld_knumv TYPE ekko-knumv.
+
+  DATA : wa_identitas TYPE t_identitas,
+         ld_tanggal(50),
+         lv_text TYPE t247-ltx.
+
+
+  SELECT SINGLE ebeln, bedat, knumv
+    FROM ekko INTO @wa_identitas
+    WHERE ebeln = @p_nopo.
+
+  IF sy-subrc = 0.
+
+  ENDIF.
+
+*  ALV Layout
+  PERFORM f_alv_build_layout  USING :
+      'ZEBRA' 'X',
+      'COLWIDTH_OPTIMIZE' 'X'.
+
+*  Sort Field
+*      PERFORM f_alv_sort   USING:
+*          'GT_DATA' 'FIELD' 'X' '' 'X'.
+
+*  print setup
+*  PERFORM f_build_print USING d_alv_print.
+
+  CALL FUNCTION 'ISP_GET_MONTH_NAME'
+    EXPORTING
+      date        = wa_identitas-tanggalpo
+      language    = 'i'
+*     MONTH_NUMBER = '00'
+    IMPORTING
+*     LANGU_BACK  =
+      longtext    = lv_text
+*     SHORTTEXT   =
+    EXCEPTIONS
+      calendar_id = 1
+      date_error  = 2
+      not_found   = 3
+      wrong_input = 4
+      OTHERS      = 5.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  CONCATENATE wa_identitas-tanggalpo+6(2) lv_text wa_identitas-tanggalpo(4) INTO ld_tanggal SEPARATED BY space.
+*CONCATENATE ld_bedat+6(2) lv_text ld_bedat(4) INTO ld_tanggal SEPARATED BY space.
+
+  PERFORM f_alv_build_comment TABLES t_header USING :
+    'S' 'Nomor PO' wa_identitas-nomorpo,
+    'S' 'Tanggal PO' ld_tanggal,
+    'S' 'No. Surat Jalan' wa_identitas-suratjalan.
+
+  PERFORM f_alv_build_event USING:
+  slis_ev_top_of_page c_top_of_page_alv,
+  slis_ev_pf_status_set c_pf_status,
+  slis_ev_user_command c_user_command.
+*  ALV Fieldcat
+  PERFORM f_build_fieldcat.
+
+*  Execute ALV
+  d_alv_varnt-variant = p_vari.
+  d_alv_bg_id = ''.
+  PERFORM f_alv_grid_display TABLES t_data[].
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  F_PF_STATUS
+*&---------------------------------------------------------------------*
+FORM f_pf_status USING fu_extab TYPE slis_t_extab.
+  REFRESH fu_extab.
+  SET PF-STATUS 'ZGUI_STATUS' EXCLUDING fu_extab.
+ENDFORM.                    "F_PF_STATUS
+
+*&---------------------------------------------------------------------*
+*&      Form F_USER_COMMAND
+*&---------------------------------------------------------------------*
+FORM f_user_command USING pzucomm LIKE sy-ucomm
+                          pselfield TYPE slis_selfield.
+
+  PERFORM f_refresh_output.
+  pselfield-refresh = 'X'.
+
+*  IF pselfield-fieldname = 'NIP'.
+*    MESSAGE 'Telah mengklik NIK' TYPE 'S'.
+*  ENDIF.
+
+  IF pzucomm = 'PRINT'.
+    PERFORM f_print_data.
+  ENDIF.
+ENDFORM.                    "F_USER_COMMAND
+
+*&---------------------------------------------------------------------*
+*&      Form  F_BUILD_FIELDCAT
+*&---------------------------------------------------------------------*
+FORM f_build_fieldcat.
+
+  PERFORM f_alv_build_catalog USING t_alv_fctlg 'T_DATA' :
+      "fname desc reftab reffld noout outln hotsp jstfy dosum rowpos colpos icon grp keysel key
+      'NO' 'Nomor' '' '' '' '10' '' '' '' '1' '1' '' '' '' '',
+      'NOPO' 'Nomor PO' '' '' '' '10' '' '' '' '1' '1' '' '' '' '',
+      'TANGGALPO' 'Tanggal PO' '' '' '' '10' '' '' '' '1' '1' '' '' '' '',
+      'NOSURAT' 'Nomor Surat jalan' '' '' '' '10' '' '' '' '1' '1' '' '' '' '',
+      'NAMAPERUSAHAAN' 'Nama Perusahaan' '' '' '' '10' '' '' '' '1' '1' '' '' '' '',
+      'ALAMAT' 'Alamat Perusahaan' '' '' '' '10' '' '' '' '1' '1' '' '' '' '',
+      'KOTA' 'Kota Perusahaan' '' '' '' '10' '' '' '' '1' '1' '' '' '' '',
+      'KODEPOS' 'Kode Pos Perusahaan' '' '' '' '10' '' '' '' '1' '1' '' '' '' '',
+      'NAMABARANG' 'Nama Barang' '' '' '' '10' '' '' '' '1' '1' '' '' '' '',
+      'KODEBARANG' 'Kode Barang' '' '' '' '10' '' '' '' '1' '1' '' '' '' '',
+      'JUMLAH' 'Jumlah' '' '' '' '10' '' '' '' '1' '1' '' '' '' '',
+      'SATUAN' 'Satuan' '' '' '' '10' '' '' '' '1' '1' '' '' '' ''.
+
+  PERFORM f_alv_build_catalog_crncy USING t_alv_fctlg 'T_DATA' :
+       "fname desc reftab reffld outln dosum curky cfield ctable jstfy rowpos colpos noout
+       'JUMLAH' 'Jumlah' '' '' '10' '' '' 'SATUAN' 'T_DATA' '' '1' '1' '',
+       'SATUAN' 'Satuan' '' '' '10' '' '' '' '' '' '1' '1' '',
+       'HARGA' 'Harga' '' '' '10' '' '' 'CURRENCY' 'T_DATA' '' '1' '1' '',
+       'CURRENCY' 'Currency' '' '' '10' '' '' '' '' '' '1' '1' ''.
+
+ENDFORM.                    "F_BUILD_FIELDCAT
+
+*&---------------------------------------------------------------------*
+*&      Form  F_REFRESH_OUTPUT
+*&---------------------------------------------------------------------*
+FORM f_refresh_output .
+  DATA lref_alv TYPE REF TO cl_gui_alv_grid.
+
+* Refresh ALV Grid itab data with new value for editable field(s).
+  IF lref_alv IS INITIAL.
+    CALL FUNCTION 'GET_GLOBALS_FROM_SLVC_FULLSCR'
+      IMPORTING
+        e_grid = lref_alv.
+  ENDIF.
+
+  IF NOT lref_alv IS INITIAL.
+    CALL METHOD lref_alv->check_changed_data.
+  ENDIF.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form F_PRINT_DATA
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_print_data .
+*
+  DATA : lv_name TYPE rs38l_fnam,
+         lv_total TYPE dmbtr,
+         lv_terbilang TYPE spell,
+         lv_terbilang1 TYPE char255,
+         lv_curr TYPE waers,
+         ld_tanggal1 TYPE char30,
+         ld_tanggalnow TYPE char30,
+         lv_text1 TYPE t247-ltx,
+         lv_text2 TYPE t247-ltx.
+
+  CALL FUNCTION 'ISP_GET_MONTH_NAME'
+    EXPORTING
+      date        = sy-datum
+      language    = 'i'
+*     MONTH_NUMBER = '00'
+    IMPORTING
+*     LANGU_BACK  =
+      longtext    = lv_text2
+*     SHORTTEXT   =
+    EXCEPTIONS
+      calendar_id = 1
+      date_error  = 2
+      not_found   = 3
+      wrong_input = 4
+      OTHERS      = 5.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+*CONCATENATE sy-datum+6(2) lv_text sy-datum(4) INTO ld_tanggal SEPARATED BY space.
+  CONCATENATE sy-datum+6(2) lv_text2 sy-datum(4) INTO ld_tanggalnow SEPARATED BY space.
+
+  READ TABLE t_data INTO wa_data INDEX 1.
+  IF sy-subrc = 0.
+    lv_no = wa_data-no.
+    lv_namaperusahaan = wa_data-namaperusahaan.
+    lv_alamat = wa_data-alamat.
+    lv_kota = wa_data-kota.
+    lv_kodepos = wa_data-kodepos.
+    lv_nopo = wa_data-nopo.
+    lv_nosurat = wa_data-nosurat.
+    lv_pemeriksa = p_nama.
+    lv_jabatan = p_jab.
+
+    CALL FUNCTION 'ISP_GET_MONTH_NAME'
+      EXPORTING
+        date        = wa_data-tanggalpo
+        language    = 'i'
+*       MONTH_NUMBER       = '00'
+      IMPORTING
+*       LANGU_BACK  =
+        longtext    = lv_text1
+*       SHORTTEXT   =
+      EXCEPTIONS
+        calendar_id = 1
+        date_error  = 2
+        not_found   = 3
+        wrong_input = 4
+        OTHERS      = 5.
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+    CONCATENATE wa_data-tanggalpo+6(2) lv_text1 wa_data-tanggalpo(4) INTO ld_tanggal1 SEPARATED BY space.
+  ENDIF.
+
+  CALL FUNCTION 'SPELL_AMOUNT'
+    EXPORTING
+      amount    = gv_total
+      currency  = 'USD'
+      filler    = ' '
+      language  = 'E'
+    IMPORTING
+      in_words  = lv_terbilang
+    EXCEPTIONS
+      not_found = 1
+      too_large = 2
+      OTHERS    = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ELSE.
+    gv_terbilang = lv_terbilang-word.
+    gv_desimal1 = lv_terbilang-decword.
+  ENDIF.
+
+  CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+    EXPORTING
+      formname           = 'YLATPOKPG24_01'
+*     VARIANT            = ' '
+*     DIRECT_CALL        = ' '
+    IMPORTING
+      fm_name            = lv_name
+    EXCEPTIONS
+      no_form            = 1
+      no_function_module = 2
+      OTHERS             = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  CALL FUNCTION '/1BCDWB/SF00000043'
+    EXPORTING
+*     ARCHIVE_INDEX         =
+*     ARCHIVE_INDEX_TAB     =
+*     ARCHIVE_PARAMETERS    =
+*     CONTROL_PARAMETERS    =
+*     MAIL_APPL_OBJ         =
+*     MAIL_RECIPIENT        =
+*     MAIL_SENDER           =
+*     OUTPUT_OPTIONS        =
+*     USER_SETTINGS         = 'X'
+      lv_namaperusahaan     = lv_namaperusahaan
+      lv_alamat             = lv_alamat
+      lv_kota               = lv_kota
+      lv_kodepos            = lv_kodepos
+      lv_nopo               = lv_nopo
+      lv_tanggalpo          = ld_tanggal1
+      lv_nosurat            = lv_nosurat
+      lv_date               = ld_tanggalnow
+      lv_pemeriksa          = lv_pemeriksa
+      lv_jabatan            = lv_jabatan
+      lv_terbilang          = gv_terbilang
+      lv_no                 = lv_no
+      lv_sub           = gv_sub
+      lv_ppn                = gv_ppn
+      lv_total              = gv_total
+      lv_desimal1           = gv_desimal1
+* IMPORTING
+*     DOCUMENT_OUTPUT_INFO  =
+*     JOB_OUTPUT_INFO       =
+*     JOB_OUTPUT_OPTIONS    =
+    TABLES
+      t_data                = t_data
+* EXCEPTIONS
+*     FORMATTING_ERROR      = 1
+*     INTERNAL_ERROR        = 2
+*     SEND_ERROR            = 3
+*     USER_CANCELED         = 4
+*     OTHERS                = 5
+    .
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form F_PRINT_DATA
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+
+
+----------------------------------------------------------------------------------------------------------------
+
+
+YLATPOKPG24TOP
+
+-----------------------------------------------------------------------------------------------------------
+
+*&---------------------------------------------------------------------*
+*&  Include ZABPSKNX00001TOP                                           *
+*&  Global Data Include                                                *
+*----------------------------------------------------------------------*
+* @data
+*-----------------------------------------------------------------------
+* TABLES: {table declaration}
+TABLES : ekko, makt, matdoc, lfa1.
+
+*-----------------------------------------------------------------------
+
+*-----------------------------------------------------------------------
+* INCLUDES: {additional include}
+
+*-----------------------------------------------------------------------
+
+*-----------------------------------------------------------------------
+* INFOTYPES: {infotype declaration}
+
+*-----------------------------------------------------------------------
+* CONSTANTS: C_ {constants declaration}
+
+*-----------------------------------------------------------------------
+* TYPES: TY_ {types declaration}
+
+*-----------------------------------------------------------------------
+
+*-----------------------------------------------------------------------
+* DATA: D_ {variable declaration}
+
+*-----------------------------------------------------------------------
+
+*-----------------------------------------------------------------------
+* DATA: BEGIN OF T_ {structure/itab declaration}
+* DATA: END OF
+*DATA: BEGIN OF t_data OCCURS 0,
+*        comp_code TYPE bukrs,
+*        desc TYPE T001-BUTXT,
+*        nip TYPE YLATPSKOPANG24_3-nip,
+*        nama TYPE YLATPSKOPANG24_3-nama,
+*        divisi TYPE YLATPSKOPANG24_3-divisi,
+*        jab TYPE YLATPSKOPANG24_3-jabatan,
+*        status TYPE char10,
+*        pend TYPE YLATPSKOPANG24_2-pendidikanterakhir,
+*        pasangan TYPE YLATPSKOPANG24_4-namapasangan.
+*DATA: END OF t_data.
+
+DATA : lv_no TYPE int3,
+       gv_tanggal TYPE char30,
+       lv_tanggal1 TYPE char30,
+       lv_tanggalnow TYPE char3,
+       lv_pemeriksa TYPE char40,
+       lv_jabatan TYPE char40,
+       gv_terbilang TYPE char255,
+       lv_namaperusahaan TYPE name1,
+       lv_alamat TYPE stras,
+       lv_kota TYPE ort01,
+       lv_kodepos TYPE pstlz,
+       lv_nopo TYPE ebeln,
+       lv_date TYPE bedat,
+       lv_nosurat TYPE knumv,
+       gv_sub TYPE DMBTR,
+       gv_ppn TYPE DMBTR,
+       gv_total TYPE DMBTR,
+       gv_desimal1 TYPE char128,
+       t_data TYPE TABLE OF YLATSTPOKPG24_02,
+       wa_data LIKE LINE OF t_data.
